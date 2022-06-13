@@ -8,9 +8,8 @@ library(leaflet.extras)
 library(readxl)
 library(shinyWidgets)
 
-
 # Load the data. See information in the about tab
-totaloccs<- read.csv("Data/totaloccs_filtered.csv", na = "NA")
+totaloccs<- read.csv("Data/totaloccs_filtered_CCAA.csv", na = "NA")
 
 # create subdatasets for those invasive and potentially invasive species, acording to their Status
 invtotaloccs<- totaloccs[totaloccs$Status=="Invasive",]
@@ -30,6 +29,12 @@ ui <- navbarPage("InvPot", id="nav",
                                                                        `Invasive` = unique(invtotaloccs$SpeciesName),
                                                                        `Potentially invasive` = unique(pottotaloccs$SpeciesName))),
                                                         options = list(`live-search` = TRUE),
+                                            
+                                            # CCAA picker:
+                                            pickerInput("CCAA", label = "Autonomous community:",
+                                                        choices = list("All",  `Autonomous communities` = unique(totaloccs$CCAA))),
+                                                                      
+                                            options = list(`live-search` = TRUE),
 
                                             textOutput("selected_status", tags$h4),
                                             textOutput("tot_regs_number", container = tags$h4),
@@ -84,6 +89,16 @@ server <- shinyServer(function(input, output) {
     }
   })
 
+    # Input the CCAA name selected 
+    selectedCCAAData <- reactive({
+      if (input$CCAA == "All"){
+        selectedData()
+      } else {
+        selectedData()[selectedData()$CCAA==input$CCAA,] 
+      }
+    })
+    
+    
   # output map
   output$map <- leaflet::renderLeaflet({
     regs <- occ_count(taxonKey = name_backbone(name=input$species)$speciesKey, georeferenced = TRUE, country = "ES")
@@ -94,7 +109,7 @@ server <- shinyServer(function(input, output) {
         addProviderTiles(providers$Stamen.Toner) %>%
         setView(lng = 5, lat = 40, zoom = 5.3)
     } else{
-      leaflet(data = selectedData()) %>%
+      leaflet(data = selectedCCAAData()) %>%
         addProviderTiles(providers$Stamen.TonerLite, 
                          options = providerTileOptions(noWrap = TRUE)
         ) %>%
@@ -114,10 +129,10 @@ server <- shinyServer(function(input, output) {
   # reactive expression to capture the data found within the actual view
   data_map <- reactive({
     if (is.null(input$map_bounds)){
-      selectedData()
+      selectedCCAAData()
     } else {
       bounds <- input$map_bounds
-        in_bounding_box(selectedData(), lat, lon, bounds)
+        in_bounding_box(selectedCCAAData(), lat, lon, bounds)
     }
   })
 
@@ -155,7 +170,7 @@ server <- shinyServer(function(input, output) {
       paste("Total Nº of records: ", nrow(pottotaloccs))
     } else {
       #regs <- occ_count(taxonKey = name_backbone(name=input$species)$speciesKey, georeferenced = TRUE, country = "ES") # a live version
-      regs <- nrow(selectedData())
+      regs <- nrow(selectedCCAAData())
       paste("Total Nº of records: ", regs)
     }
   })
